@@ -1,0 +1,96 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pullcite"
+version = "0.2.1"
+description = "Evidence-backed structured extraction from documents"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [
+    { name = "UserCanDo", email = "dev@usercando.com" },
+]
+maintainers = [
+    { name = "Dike Kalu", email = "dike@usercando.com" },
+]
+keywords = [
+    "extraction",
+    "llm",
+    "evidence",
+    "pdf",
+    "structured-output",
+    "pydantic",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Text Processing :: General",
+]
+dependencies = [
+    "black>=25.12.0",
+    "pydantic>=2.0",
+    "numpy>=1.24.0",
+]
+
+[project.optional-dependencies]
+anthropic = ["anthropic>=0.30.0"]
+openai = ["openai>=1.0.0"]
+voyage = ["voyageai>=0.2.0"]
+chroma = ["chromadb>=0.4.0"]
+pgvector = ["psycopg2-binary>=2.9.0", "pgvector>=0.2.0"]
+local = ["sentence-transformers>=2.2.0"]
+docling = ["docling>=2.0.0"]
+tantivy = ["tantivy>=0.22.0"]
+all = [
+    "pullcite[anthropic]",
+    "pullcite[openai]",
+    "pullcite[voyage]",
+    "pullcite[chroma]",
+    "pullcite[pgvector]",
+    "pullcite[local]",
+    "pullcite[docling]",
+    "pullcite[tantivy]",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "mypy>=1.0.0",
+    "ruff>=0.1.0",
+    "faker>=40.0.0",
+]
+
+[project.urls]
+Homepage = "https://pullcite.com"
+Repository = "https://github.com/usercando/pullcite"
+Documentation = "https://github.com/usercando/pullcite#readme"
+
+[tool.hatch.build.targets.wheel]
+packages = ["pullcite"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_ignores = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["E501"]  # Line too long (handled by formatter)
