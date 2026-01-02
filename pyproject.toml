@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pullcite"
-version = "0.0.1"
+version = "0.0.2"
 description = "Evidence-backed structured extraction from documents"
 readme = "README.md"
 license = "MIT"
@@ -28,9 +28,11 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Text Processing :: General",
 ]
 dependencies = [
     "black>=25.12.0",
@@ -64,9 +66,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/UserCanDO/pullcite"
-Documentation = "https://github.com/UserCanDO/pullcite#readme"
-Repository = "https://github.com/UserCanDO/pullcite"
+Homepage = "https://pullcite.com"
+Repository = "https://github.com/usercando/pullcite"
+Documentation = "https://github.com/usercando/pullcite#readme"
 
 [tool.hatch.build.targets.wheel]
 packages = ["pullcite"]
