@@ -52,7 +52,7 @@ Example:
     >>> print(evidence.page)   # Page number
 """
 
-__version__ = "0.1.0"
+__version__ = "0.0.1"
 
 # Core types
 from .core.document import Document
