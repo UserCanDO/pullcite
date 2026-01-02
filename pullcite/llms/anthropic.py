@@ -24,9 +24,14 @@ from .base import (
 
 # Model configurations
 ANTHROPIC_MODELS = {
+    # Claude 4.5 (latest)
+    "claude-opus-4-5-20251101": {"max_tokens": 8192},
+    # Claude 4
     "claude-sonnet-4-20250514": {"max_tokens": 8192},
+    # Claude 3.5
     "claude-3-5-sonnet-20241022": {"max_tokens": 8192},
     "claude-3-5-haiku-20241022": {"max_tokens": 8192},
+    # Claude 3
     "claude-3-opus-20240229": {"max_tokens": 4096},
     "claude-3-sonnet-20240229": {"max_tokens": 4096},
     "claude-3-haiku-20240307": {"max_tokens": 4096},

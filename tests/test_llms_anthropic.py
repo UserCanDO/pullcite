@@ -20,6 +20,7 @@ class TestAnthropicModels:
     """Test model configurations."""
 
     def test_supported_models(self):
+        assert "claude-opus-4-5-20251101" in ANTHROPIC_MODELS
         assert "claude-sonnet-4-20250514" in ANTHROPIC_MODELS
         assert "claude-3-5-sonnet-20241022" in ANTHROPIC_MODELS
         assert "claude-3-5-haiku-20241022" in ANTHROPIC_MODELS
@@ -28,6 +29,7 @@ class TestAnthropicModels:
         assert "claude-3-haiku-20240307" in ANTHROPIC_MODELS
 
     def test_model_max_tokens(self):
+        assert ANTHROPIC_MODELS["claude-opus-4-5-20251101"]["max_tokens"] == 8192
         assert ANTHROPIC_MODELS["claude-sonnet-4-20250514"]["max_tokens"] == 8192
         assert ANTHROPIC_MODELS["claude-3-opus-20240229"]["max_tokens"] == 4096
 
