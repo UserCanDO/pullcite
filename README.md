@@ -843,7 +843,7 @@ export DATABASE_URL="postgresql://user:pass@localhost/pullcite"
 
 **LLMs:**
 - Anthropic: `claude-opus-4-5-20251101`, `claude-sonnet-4-20250514`, `claude-3-5-sonnet-20241022`, `claude-3-opus-20240229`
-- OpenAI: `gpt-4o`, `gpt-4o-mini`, `gpt-4-turbo`, `gpt-4`, `gpt-3.5-turbo`
+- OpenAI: `gpt-5.2`, `gpt-5.1`, `gpt-5`, `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano`, `gpt-4o`, `gpt-4o-mini`, `gpt-oss-120b`, `gpt-oss-20b`
 
 **Embeddings:**
 - OpenAI: `text-embedding-3-small` (1536d), `text-embedding-3-large` (3072d)

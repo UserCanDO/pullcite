@@ -24,11 +24,22 @@ from .base import (
 
 # Model configurations
 OPENAI_MODELS = {
+    # Latest flagship conversational models
+    "gpt-5.2": {"max_tokens": 16384},
+    "gpt-5.1": {"max_tokens": 16384},
+    "gpt-5": {"max_tokens": 16384},
+    # Long-context family (1M token context support)
+    "gpt-4.1": {"max_tokens": 32768},
+    "gpt-4.1-mini": {"max_tokens": 32768},
+    "gpt-4.1-nano": {"max_tokens": 32768},
+    # Omni series / general multimodal models
     "gpt-4o": {"max_tokens": 16384},
     "gpt-4o-mini": {"max_tokens": 16384},
-    "gpt-4-turbo": {"max_tokens": 4096},
-    "gpt-4": {"max_tokens": 8192},
-    "gpt-3.5-turbo": {"max_tokens": 4096},
+    "gpt-4o-realtime": {"max_tokens": 16384},
+    "gpt-4o-mini-realtime": {"max_tokens": 16384},
+    # Open-weight models
+    "gpt-oss-120b": {"max_tokens": 131072},
+    "gpt-oss-20b": {"max_tokens": 131072},
 }
 
 

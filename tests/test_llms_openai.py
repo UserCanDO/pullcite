@@ -21,15 +21,28 @@ class TestOpenAIModels:
     """Test model configurations."""
 
     def test_supported_models(self):
+        # Flagship conversational models
+        assert "gpt-5.2" in OPENAI_MODELS
+        assert "gpt-5.1" in OPENAI_MODELS
+        assert "gpt-5" in OPENAI_MODELS
+        # Long-context family
+        assert "gpt-4.1" in OPENAI_MODELS
+        assert "gpt-4.1-mini" in OPENAI_MODELS
+        assert "gpt-4.1-nano" in OPENAI_MODELS
+        # Omni series
         assert "gpt-4o" in OPENAI_MODELS
         assert "gpt-4o-mini" in OPENAI_MODELS
-        assert "gpt-4-turbo" in OPENAI_MODELS
-        assert "gpt-4" in OPENAI_MODELS
-        assert "gpt-3.5-turbo" in OPENAI_MODELS
+        assert "gpt-4o-realtime" in OPENAI_MODELS
+        assert "gpt-4o-mini-realtime" in OPENAI_MODELS
+        # Open-weight models
+        assert "gpt-oss-120b" in OPENAI_MODELS
+        assert "gpt-oss-20b" in OPENAI_MODELS
 
     def test_model_max_tokens(self):
+        assert OPENAI_MODELS["gpt-5.2"]["max_tokens"] == 16384
+        assert OPENAI_MODELS["gpt-4.1"]["max_tokens"] == 32768
         assert OPENAI_MODELS["gpt-4o"]["max_tokens"] == 16384
-        assert OPENAI_MODELS["gpt-4"]["max_tokens"] == 8192
+        assert OPENAI_MODELS["gpt-oss-120b"]["max_tokens"] == 131072
 
 
 class TestOpenAILLMInit:
@@ -71,8 +84,8 @@ class TestOpenAILLMInit:
         assert llm.model == "gpt-4o"
 
     def test_model_name_property(self):
-        llm = OpenAILLM(api_key="key", model="gpt-4-turbo")
-        assert llm.model_name == "gpt-4-turbo"
+        llm = OpenAILLM(api_key="key", model="gpt-4.1")
+        assert llm.model_name == "gpt-4.1"
 
 
 class TestOpenAILLMClient:
@@ -403,7 +416,7 @@ class TestOpenAIComplete:
         assert len(call_kwargs["tools"]) == 1
 
     def test_complete_custom_parameters(self):
-        llm = OpenAILLM(api_key="test-key", model="gpt-4-turbo")
+        llm = OpenAILLM(api_key="test-key", model="gpt-4.1")
 
         mock_client = MagicMock()
         mock_response = MagicMock()
@@ -413,7 +426,7 @@ class TestOpenAIComplete:
         mock_response.choices[0].finish_reason = "stop"
         mock_response.usage.prompt_tokens = 10
         mock_response.usage.completion_tokens = 5
-        mock_response.model = "gpt-4-turbo"
+        mock_response.model = "gpt-4.1"
 
         mock_client.chat.completions.create.return_value = mock_response
 
@@ -425,7 +438,7 @@ class TestOpenAIComplete:
             )
 
         call_kwargs = mock_client.chat.completions.create.call_args[1]
-        assert call_kwargs["model"] == "gpt-4-turbo"
+        assert call_kwargs["model"] == "gpt-4.1"
         assert call_kwargs["temperature"] == 0.7
         assert call_kwargs["max_tokens"] == 1000
 
