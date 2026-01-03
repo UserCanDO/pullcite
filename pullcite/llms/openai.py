@@ -23,12 +23,15 @@ from .base import (
 
 
 # Model configurations
+# Models that use max_completion_tokens instead of max_tokens
+_COMPLETION_TOKEN_MODELS = {"gpt-5", "gpt-4.1"}
+
 OPENAI_MODELS = {
-    # Latest flagship conversational models
+    # Latest flagship conversational models (use max_completion_tokens)
     "gpt-5.2": {"max_tokens": 16384},
     "gpt-5.1": {"max_tokens": 16384},
     "gpt-5": {"max_tokens": 16384},
-    # Long-context family (1M token context support)
+    # Long-context family (use max_completion_tokens)
     "gpt-4.1": {"max_tokens": 32768},
     "gpt-4.1-mini": {"max_tokens": 32768},
     "gpt-4.1-nano": {"max_tokens": 32768},
@@ -41,6 +44,14 @@ OPENAI_MODELS = {
     "gpt-oss-120b": {"max_tokens": 131072},
     "gpt-oss-20b": {"max_tokens": 131072},
 }
+
+
+def _uses_completion_tokens(model: str) -> bool:
+    """Check if model uses max_completion_tokens instead of max_tokens."""
+    for prefix in _COMPLETION_TOKEN_MODELS:
+        if model.startswith(prefix):
+            return True
+    return False
 
 
 @dataclass
@@ -219,10 +230,17 @@ class OpenAILLM(LLM):
             converted_messages = self._convert_messages(messages)
             converted_tools = self._convert_tools(tools)
 
+            # gpt-5.x and gpt-4.1 models use max_completion_tokens
+            token_param = (
+                "max_completion_tokens"
+                if _uses_completion_tokens(self.model)
+                else "max_tokens"
+            )
+
             kwargs: dict[str, Any] = {
                 "model": self.model,
                 "messages": converted_messages,
-                "max_tokens": max_tokens,
+                token_param: max_tokens,
                 "temperature": temperature,
             }
 

@@ -440,7 +440,55 @@ class TestOpenAIComplete:
         call_kwargs = mock_client.chat.completions.create.call_args[1]
         assert call_kwargs["model"] == "gpt-4.1"
         assert call_kwargs["temperature"] == 0.7
-        assert call_kwargs["max_tokens"] == 1000
+        # gpt-4.1 uses max_completion_tokens
+        assert call_kwargs["max_completion_tokens"] == 1000
+        assert "max_tokens" not in call_kwargs
+
+    def test_gpt5_uses_max_completion_tokens(self):
+        """Test that gpt-5.x models use max_completion_tokens parameter."""
+        llm = OpenAILLM(api_key="test-key", model="gpt-5.2")
+
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = "Response"
+        mock_response.choices[0].message.tool_calls = None
+        mock_response.choices[0].finish_reason = "stop"
+        mock_response.usage.prompt_tokens = 10
+        mock_response.usage.completion_tokens = 5
+        mock_response.model = "gpt-5.2"
+
+        mock_client.chat.completions.create.return_value = mock_response
+
+        with patch.object(llm, "_get_client", return_value=mock_client):
+            llm.complete([Message.user("Test")], max_tokens=8000)
+
+        call_kwargs = mock_client.chat.completions.create.call_args[1]
+        assert call_kwargs["max_completion_tokens"] == 8000
+        assert "max_tokens" not in call_kwargs
+
+    def test_gpt4o_uses_max_tokens(self):
+        """Test that gpt-4o models use max_tokens parameter."""
+        llm = OpenAILLM(api_key="test-key", model="gpt-4o")
+
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = "Response"
+        mock_response.choices[0].message.tool_calls = None
+        mock_response.choices[0].finish_reason = "stop"
+        mock_response.usage.prompt_tokens = 10
+        mock_response.usage.completion_tokens = 5
+        mock_response.model = "gpt-4o"
+
+        mock_client.chat.completions.create.return_value = mock_response
+
+        with patch.object(llm, "_get_client", return_value=mock_client):
+            llm.complete([Message.user("Test")], max_tokens=4000)
+
+        call_kwargs = mock_client.chat.completions.create.call_args[1]
+        assert call_kwargs["max_tokens"] == 4000
+        assert "max_completion_tokens" not in call_kwargs
 
     def test_complete_api_error(self):
         llm = OpenAILLM(api_key="test-key")
