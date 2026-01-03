@@ -179,20 +179,47 @@ class ExtractionStrategy(ABC):
         return "\n".join(lines)
 
 
+@dataclass
 class DefaultStrategy(ExtractionStrategy):
     """
     Default extraction strategy.
 
     Provides generic prompts that work for most documents.
-    For better results, create a domain-specific strategy.
+    For better results, create a domain-specific strategy or provide
+    custom prompts.
+
+    Attributes:
+        extractor_prompt: Custom extractor prompt (overrides default).
+        verifier_prompt: Custom verifier prompt (overrides default).
+        corrector_prompt: Custom corrector prompt (overrides default).
+        extra_instructions: Additional instructions appended to default prompts.
+
+    Example:
+        # Full override
+        strategy = DefaultStrategy(
+            extractor_prompt="You are an SBC expert..."
+        )
+
+        # Append to defaults
+        strategy = DefaultStrategy(
+            extra_instructions="Focus on deductibles. This is a PPO plan."
+        )
     """
 
+    extractor_prompt: str | None = None
+    verifier_prompt: str | None = None
+    corrector_prompt: str | None = None
+    extra_instructions: str | None = None
+
     def build_extractor_prompt(self, context: StrategyContext) -> str:
-        """Build generic extraction prompt."""
+        """Build extraction prompt, using custom if provided."""
+        if self.extractor_prompt is not None:
+            return self.extractor_prompt
+
         schema_name = context.schema.__name__
         schema_fields = self._describe_schema(context.schema)
 
-        return f"""You are a precise document extraction assistant.
+        prompt = f"""You are a precise document extraction assistant.
 
 Your task is to extract structured data from the provided document.
 
@@ -208,9 +235,17 @@ INSTRUCTIONS:
 
 Be precise and accurate. Extract only what is explicitly stated in the document."""
 
+        if self.extra_instructions:
+            prompt += f"\n\nADDITIONAL INSTRUCTIONS:\n{self.extra_instructions}"
+
+        return prompt
+
     def build_verifier_prompt(self, context: StrategyContext) -> str:
-        """Build generic verification prompt."""
-        return """You are a verification assistant with access to a search tool.
+        """Build verification prompt, using custom if provided."""
+        if self.verifier_prompt is not None:
+            return self.verifier_prompt
+
+        prompt = """You are a verification assistant with access to a search tool.
 
 Your task is to verify that extracted values are correct by finding
 supporting evidence in the document.
@@ -234,9 +269,17 @@ For each field, report:
 
 Be thorough and accurate. Search multiple times if needed."""
 
+        if self.extra_instructions:
+            prompt += f"\n\nADDITIONAL INSTRUCTIONS:\n{self.extra_instructions}"
+
+        return prompt
+
     def build_corrector_prompt(self, context: StrategyContext) -> str:
-        """Build generic correction prompt."""
-        return """You are a correction assistant.
+        """Build correction prompt, using custom if provided."""
+        if self.corrector_prompt is not None:
+            return self.corrector_prompt
+
+        prompt = """You are a correction assistant.
 
 Some extracted values were found to be incorrect during verification.
 Your task is to provide corrected values based on the verification results.
@@ -254,6 +297,11 @@ Provide corrections as a JSON object with paths as keys:
 }
 
 Only include fields that need correction."""
+
+        if self.extra_instructions:
+            prompt += f"\n\nADDITIONAL INSTRUCTIONS:\n{self.extra_instructions}"
+
+        return prompt
 
     def _describe_schema(self, schema: Type["BaseModel"]) -> str:
         """Generate a description of the schema fields."""

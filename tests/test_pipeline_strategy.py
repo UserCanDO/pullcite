@@ -220,5 +220,119 @@ class TestStrategyCustomization:
         assert "2 fields" in strategy.build_verifier_prompt(sample_context)
 
 
+class TestDefaultStrategyCustomPrompts:
+    """Test DefaultStrategy custom prompt fields."""
+
+    def test_custom_extractor_prompt_overrides_default(self, sample_context):
+        custom_prompt = "You are an SBC expert. Extract health insurance data."
+        strategy = DefaultStrategy(extractor_prompt=custom_prompt)
+
+        prompt = strategy.build_extractor_prompt(sample_context)
+
+        assert prompt == custom_prompt
+        assert "SampleSchema" not in prompt  # Default content not present
+
+    def test_custom_verifier_prompt_overrides_default(self, sample_context):
+        custom_prompt = "You are a verification specialist."
+        strategy = DefaultStrategy(verifier_prompt=custom_prompt)
+
+        prompt = strategy.build_verifier_prompt(sample_context)
+
+        assert prompt == custom_prompt
+        assert "search tool" not in prompt.lower()  # Default content not present
+
+    def test_custom_corrector_prompt_overrides_default(self, sample_context):
+        custom_prompt = "Fix the errors you find."
+        strategy = DefaultStrategy(corrector_prompt=custom_prompt)
+
+        prompt = strategy.build_corrector_prompt(sample_context)
+
+        assert prompt == custom_prompt
+        assert "verification result" not in prompt.lower()  # Default content not present
+
+    def test_extra_instructions_appends_to_extractor(self, sample_context):
+        instructions = "Focus on deductibles. This is a PPO plan."
+        strategy = DefaultStrategy(extra_instructions=instructions)
+
+        prompt = strategy.build_extractor_prompt(sample_context)
+
+        # Default content still present
+        assert "SampleSchema" in prompt
+        assert "extract" in prompt.lower()
+        # Extra instructions appended
+        assert "ADDITIONAL INSTRUCTIONS" in prompt
+        assert instructions in prompt
+
+    def test_extra_instructions_appends_to_verifier(self, sample_context):
+        instructions = "Pay special attention to copay amounts."
+        strategy = DefaultStrategy(extra_instructions=instructions)
+
+        prompt = strategy.build_verifier_prompt(sample_context)
+
+        # Default content still present
+        assert "search tool" in prompt.lower()
+        assert "verify" in prompt.lower()
+        # Extra instructions appended
+        assert "ADDITIONAL INSTRUCTIONS" in prompt
+        assert instructions in prompt
+
+    def test_extra_instructions_appends_to_corrector(self, sample_context):
+        instructions = "Use the found_value when available."
+        strategy = DefaultStrategy(extra_instructions=instructions)
+
+        prompt = strategy.build_corrector_prompt(sample_context)
+
+        # Default content still present
+        assert "correction" in prompt.lower()
+        assert "JSON" in prompt
+        # Extra instructions appended
+        assert "ADDITIONAL INSTRUCTIONS" in prompt
+        assert instructions in prompt
+
+    def test_none_values_use_default_behavior(self, sample_context):
+        strategy = DefaultStrategy(
+            extractor_prompt=None,
+            verifier_prompt=None,
+            corrector_prompt=None,
+            extra_instructions=None,
+        )
+
+        extractor = strategy.build_extractor_prompt(sample_context)
+        verifier = strategy.build_verifier_prompt(sample_context)
+        corrector = strategy.build_corrector_prompt(sample_context)
+
+        # All should use defaults
+        assert "SampleSchema" in extractor
+        assert "search tool" in verifier.lower()
+        assert "correction" in corrector.lower()
+        # No additional instructions section
+        assert "ADDITIONAL INSTRUCTIONS" not in extractor
+        assert "ADDITIONAL INSTRUCTIONS" not in verifier
+        assert "ADDITIONAL INSTRUCTIONS" not in corrector
+
+    def test_custom_prompt_ignores_extra_instructions(self, sample_context):
+        custom_prompt = "My custom prompt."
+        instructions = "These should be ignored."
+        strategy = DefaultStrategy(
+            extractor_prompt=custom_prompt,
+            extra_instructions=instructions,
+        )
+
+        prompt = strategy.build_extractor_prompt(sample_context)
+
+        # Custom prompt returned as-is
+        assert prompt == custom_prompt
+        # Extra instructions not appended (custom prompt takes precedence)
+        assert instructions not in prompt
+
+    def test_dataclass_defaults(self):
+        strategy = DefaultStrategy()
+
+        assert strategy.extractor_prompt is None
+        assert strategy.verifier_prompt is None
+        assert strategy.corrector_prompt is None
+        assert strategy.extra_instructions is None
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
