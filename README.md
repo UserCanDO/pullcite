@@ -459,6 +459,88 @@ original = {"deductible": 500, "copay": 25, "name": "Basic Plan"}
 patches = create_patches(corrections, original, reason="Verification correction")
 ```
 
+### Custom Extraction Strategies
+
+The `DefaultStrategy` provides sensible default prompts, but you can customize them for your domain:
+
+```python
+from pullcite.pipeline.strategy import DefaultStrategy, StrategyContext
+
+# Option 1: Full prompt override
+# Use when you need complete control over the prompt
+strategy = DefaultStrategy(
+    extractor_prompt="""You are an expert at extracting health insurance data from SBC documents.
+
+Your task is to extract structured data matching the provided schema.
+
+IMPORTANT:
+- Pay special attention to deductible and copay amounts
+- Distinguish between in-network and out-of-network values
+- Look for coverage tiers (Individual, Family, etc.)
+
+Output valid JSON only."""
+)
+
+# Option 2: Append extra instructions to defaults
+# Use when the default prompts are good but need domain context
+strategy = DefaultStrategy(
+    extra_instructions="""
+Focus on:
+- This is a PPO plan, so in-network/out-of-network distinction matters
+- Deductibles are typically listed in the "Costs" section
+- Mental health coverage may be under "Behavioral Health"
+"""
+)
+
+# Option 3: Mix - override some prompts, augment others
+strategy = DefaultStrategy(
+    extractor_prompt="Custom extraction prompt...",  # Full override
+    extra_instructions="Extra context for verifier and corrector",  # Appends to defaults
+)
+
+# Option 4: Override individual prompts
+strategy = DefaultStrategy(
+    verifier_prompt="""You are verifying extracted insurance values.
+
+Search the document carefully. Insurance documents often have:
+- Summary tables at the beginning
+- Detailed coverage grids in the middle
+- Exclusions and limitations at the end
+
+For each value, find the exact quote that supports it.""",
+)
+
+# Use the strategy with StrategyContext
+from pullcite.core.document import Document
+from pydantic import BaseModel
+
+class HealthPlan(BaseModel):
+    deductible: float
+    copay: float
+
+doc = Document.from_file("sbc.pdf")
+context = StrategyContext(
+    document=doc,
+    schema=HealthPlan,
+    critical_fields=[],
+)
+
+# Get the customized prompts
+extractor_prompt = strategy.build_extractor_prompt(context)
+verifier_prompt = strategy.build_verifier_prompt(context)
+corrector_prompt = strategy.build_corrector_prompt(context)
+```
+
+**When to use each option:**
+
+| Scenario | Approach |
+|----------|----------|
+| Domain-specific extraction (insurance, legal, medical) | `extractor_prompt` override |
+| Adding context without changing prompt structure | `extra_instructions` |
+| Custom verification logic | `verifier_prompt` override |
+| Tweaking correction behavior | `corrector_prompt` override |
+| Production with known document types | Full custom strategy class |
+
 ### Full Extraction Pipeline
 
 ```python
@@ -760,7 +842,7 @@ export DATABASE_URL="postgresql://user:pass@localhost/pullcite"
 ### Supported Models
 
 **LLMs:**
-- Anthropic: `claude-sonnet-4-20250514`, `claude-3-5-sonnet-20241022`, `claude-3-opus-20240229`
+- Anthropic: `claude-opus-4-5-20251101`, `claude-sonnet-4-20250514`, `claude-3-5-sonnet-20241022`, `claude-3-opus-20240229`
 - OpenAI: `gpt-4o`, `gpt-4o-mini`, `gpt-4-turbo`, `gpt-4`, `gpt-3.5-turbo`
 
 **Embeddings:**
