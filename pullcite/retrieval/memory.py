@@ -229,6 +229,54 @@ class MemoryRetriever(Retriever):
         except Exception as e:
             raise RetrieverError(f"Batch search failed: {e}", cause=e)
 
+    def add(self, text: str, metadata: dict | None = None) -> None:
+        """
+        Add a single chunk to the index.
+
+        This is used by HybridSearcher to add chunks individually
+        rather than indexing an entire Document at once.
+
+        Args:
+            text: Text content of the chunk.
+            metadata: Optional metadata dict. May include 'chunk_index', 'page', etc.
+
+        Raises:
+            RetrieverError: If embedding fails.
+        """
+        from ..core.chunk import Chunk
+
+        meta = metadata or {}
+        chunk_index = meta.get("chunk_index", len(self._chunks))
+        page = meta.get("page")
+
+        chunk = Chunk(
+            index=chunk_index,
+            text=text,
+            page=page,
+            metadata={k: v for k, v in meta.items() if k not in ("chunk_index", "page")},
+        )
+
+        try:
+            # Embed the chunk
+            result = self._embedder.embed(text)
+            vec = np.array(result.vector, dtype=np.float32)
+
+            # Normalize
+            norm = np.linalg.norm(vec)
+            if norm > 0:
+                vec = vec / norm
+
+            # Add to index
+            self._chunks.append(chunk)
+
+            if self._embeddings is None:
+                self._embeddings = vec.reshape(1, -1)
+            else:
+                self._embeddings = np.vstack([self._embeddings, vec.reshape(1, -1)])
+
+        except Exception as e:
+            raise RetrieverError(f"Failed to add chunk: {e}", cause=e)
+
     def clear(self) -> None:
         """Clear the index."""
         self._chunks = []

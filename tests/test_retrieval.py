@@ -235,3 +235,128 @@ class TestRetrieverABC:
         assert retriever.search_calls == ["q1", "q2", "q3"]
         assert results[0].query == "q1"
         assert results[1].query == "q2"
+
+
+class TestMemoryRetrieverAdd:
+    """Test MemoryRetriever.add() method for HybridSearcher compatibility."""
+
+    def _make_embedder(self):
+        """Create a mock embedder for testing."""
+        from pullcite.embeddings.base import (
+            Embedder,
+            EmbeddingResult,
+            BatchEmbeddingResult,
+        )
+
+        class MockEmbedder(Embedder):
+            """Mock embedder that uses simple word-based vectors."""
+
+            @property
+            def model_name(self) -> str:
+                return "mock"
+
+            @property
+            def dimensions(self) -> int:
+                return 4
+
+            def embed(self, text: str) -> EmbeddingResult:
+                # Simple vector based on keywords
+                words = text.lower().split()
+                vec = (
+                    1.0 if "deductible" in words else 0.0,
+                    1.0 if "copay" in words else 0.0,
+                    1.0 if "premium" in words else 0.0,
+                    1.0 if "coverage" in words else 0.0,
+                )
+                return EmbeddingResult(
+                    vector=vec,
+                    model="mock",
+                    dimensions=4,
+                    token_count=len(words),
+                )
+
+            def embed_batch(self, texts: list[str]) -> BatchEmbeddingResult:
+                results = [self.embed(t) for t in texts]
+                return BatchEmbeddingResult(
+                    vectors=tuple(r.vector for r in results),
+                    model="mock",
+                    dimensions=4,
+                    total_tokens=sum(r.token_count for r in results),
+                )
+
+        return MockEmbedder()
+
+    def test_add_single_chunk(self):
+        """Test adding a single chunk."""
+        from pullcite.retrieval.memory import MemoryRetriever
+
+        embedder = self._make_embedder()
+        retriever = MemoryRetriever(_embedder=embedder)
+
+        assert not retriever.is_indexed
+
+        retriever.add(text="The deductible is $500.", metadata={"chunk_index": 0})
+
+        assert retriever.is_indexed
+        assert retriever.chunk_count == 1
+
+    def test_add_multiple_chunks(self):
+        """Test adding multiple chunks sequentially."""
+        from pullcite.retrieval.memory import MemoryRetriever
+
+        embedder = self._make_embedder()
+        retriever = MemoryRetriever(_embedder=embedder)
+
+        retriever.add(text="The deductible is $500.", metadata={"chunk_index": 0})
+        retriever.add(text="Copay for visits is $20.", metadata={"chunk_index": 1})
+        retriever.add(text="Monthly premium is $300.", metadata={"chunk_index": 2})
+
+        assert retriever.chunk_count == 3
+
+    def test_add_and_search(self):
+        """Test that added chunks can be searched."""
+        from pullcite.retrieval.memory import MemoryRetriever
+
+        embedder = self._make_embedder()
+        retriever = MemoryRetriever(_embedder=embedder)
+
+        retriever.add(text="The deductible is $500.", metadata={"chunk_index": 0})
+        retriever.add(text="Copay for visits is $20.", metadata={"chunk_index": 1})
+        retriever.add(text="Monthly premium is $300.", metadata={"chunk_index": 2})
+
+        # Search should find deductible chunk first
+        results = retriever.search("deductible", k=3)
+
+        assert len(results) > 0
+        assert "deductible" in results.top.text.lower()
+
+    def test_add_with_page_metadata(self):
+        """Test that page metadata is preserved."""
+        from pullcite.retrieval.memory import MemoryRetriever
+
+        embedder = self._make_embedder()
+        retriever = MemoryRetriever(_embedder=embedder)
+
+        retriever.add(
+            text="The deductible is $500.",
+            metadata={"chunk_index": 0, "page": 5},
+        )
+
+        results = retriever.search("deductible", k=1)
+        assert results.top.page == 5
+
+    def test_add_without_chunk_index(self):
+        """Test that chunk_index defaults to current length."""
+        from pullcite.retrieval.memory import MemoryRetriever
+
+        embedder = self._make_embedder()
+        retriever = MemoryRetriever(_embedder=embedder)
+
+        # Add without specifying chunk_index
+        retriever.add(text="First chunk")
+        retriever.add(text="Second chunk")
+
+        assert retriever.chunk_count == 2
+        # Both chunks should be searchable
+        results = retriever.search("chunk", k=2)
+        assert len(results) == 2

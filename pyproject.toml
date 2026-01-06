@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pullcite"
-version = "0.2.1"
+version = "0.2.2"
 description = "Evidence-backed structured extraction from documents"
 readme = "README.md"
 license = "MIT"
