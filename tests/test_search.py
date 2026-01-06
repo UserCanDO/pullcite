@@ -245,6 +245,74 @@ class TestHybridSearcher:
 
         assert not hybrid.is_indexed
 
+    def test_hybrid_with_memory_retriever(self):
+        """
+        Test HybridSearcher works with MemoryRetriever.
+
+        Regression test for bug where HybridSearcher.index() would fail with:
+        TypeError: MemoryRetriever.index() takes 2 positional arguments but 3 were given
+
+        The fix added MemoryRetriever.add() method that HybridSearcher uses.
+        """
+        from pullcite.retrieval.memory import MemoryRetriever
+        from pullcite.embeddings.base import Embedder, EmbeddingResult, BatchEmbeddingResult
+
+        # Create mock embedder
+        class MockEmbedder(Embedder):
+            @property
+            def model_name(self) -> str:
+                return "mock"
+
+            @property
+            def dimensions(self) -> int:
+                return 4
+
+            def embed(self, text: str) -> EmbeddingResult:
+                words = text.lower().split()
+                vec = (
+                    1.0 if "deductible" in words else 0.0,
+                    1.0 if "copay" in words else 0.0,
+                    1.0 if "premium" in words else 0.0,
+                    0.5,  # baseline
+                )
+                return EmbeddingResult(vector=vec, model="mock", dimensions=4, token_count=len(words))
+
+            def embed_batch(self, texts: list[str]) -> BatchEmbeddingResult:
+                results = [self.embed(t) for t in texts]
+                return BatchEmbeddingResult(
+                    vectors=tuple(r.vector for r in results),
+                    model="mock",
+                    dimensions=4,
+                    total_tokens=sum(r.token_count for r in results),
+                )
+
+        # Setup
+        bm25 = BM25Searcher()
+        retriever = MemoryRetriever(_embedder=MockEmbedder())
+
+        hybrid = HybridSearcher(
+            bm25_searcher=bm25,
+            retriever=retriever,
+            bm25_weight=0.5,
+        )
+
+        chunks = [
+            "The deductible is $500.",
+            "Copay for visits is $20.",
+            "Monthly premium is $300.",
+        ]
+
+        # This would raise TypeError before the fix
+        hybrid.index(chunks)
+
+        assert hybrid.is_indexed
+        assert hybrid.document_count == 3
+
+        # Verify search works
+        results = hybrid.search("deductible", top_k=3)
+        assert len(results) > 0
+        assert "deductible" in results[0].text.lower()
+
 
 class TestBM25SearcherFallback:
     """Tests for pure Python BM25 fallback (when tantivy not available)."""
