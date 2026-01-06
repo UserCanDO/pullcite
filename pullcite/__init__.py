@@ -46,7 +46,7 @@ Example:
     >>> print(evidence.bbox)           # Bounding box coordinates
 """
 
-__version__ = "0.2.3"
+__version__ = "0.2.4"
 
 # Core types
 from .core.document import Document

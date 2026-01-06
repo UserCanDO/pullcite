@@ -197,21 +197,19 @@ class BM25Searcher(Searcher):
 
     def _search_tantivy(self, query: str, top_k: int) -> list[SearchResult]:
         """Search using tantivy."""
-        import tantivy
-
         if self._index is None:
             return []
 
         searcher = self._index.searcher()
-        query_parser = tantivy.QueryParser.for_index(self._index, ["content"])
 
+        # Use index.parse_query() - works with tantivy 0.22+
         try:
-            parsed_query = query_parser.parse_query(query)
+            parsed_query = self._index.parse_query(query, ["content"])
         except Exception:
             # If query parsing fails, try escaping special characters
             escaped = re.sub(r'([+\-&|!(){}[\]^"~*?:\\/])', r"\\\1", query)
             try:
-                parsed_query = query_parser.parse_query(escaped)
+                parsed_query = self._index.parse_query(escaped, ["content"])
             except Exception:
                 return []
 
