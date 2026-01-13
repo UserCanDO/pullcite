@@ -133,6 +133,23 @@ extractor = Extractor(
 result = extractor.extract(doc)
 ```
 
+### Structured Outputs (Claude)
+
+Use `to_json_schema()` to compile your schema and enable Claude structured outputs
+with `output_format`.
+
+```python
+schema_json = HealthPlan.to_json_schema()
+
+extractor = Extractor(
+    schema=HealthPlan,
+    llm=AnthropicLLM(structured_output=True),
+    searcher=BM25Searcher(),
+)
+```
+
+Structured outputs cannot be combined with Claude citations.
+
 ### top_k Parameter
 
 Controls chunks retrieved per field. **Critical for quality.**

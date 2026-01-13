@@ -6,10 +6,9 @@ Uses the Anthropic API to generate completions with Claude models.
 
 from __future__ import annotations
 
-import json
 import os
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from .base import (
     LLM,
@@ -57,6 +56,9 @@ class AnthropicLLM(LLM):
 
     api_key: str | None = None
     model: str = "claude-sonnet-4-20250514"
+    structured_output: bool = False
+    decimals_as: Literal["string", "number"] = "string"
+    citations: bool = False
 
     def __post_init__(self) -> None:
         """Initialize and validate."""
@@ -72,6 +74,15 @@ class AnthropicLLM(LLM):
             raise LLMError(
                 f"Unknown model: {self.model}. "
                 f"Supported: {list(ANTHROPIC_MODELS.keys())}"
+            )
+
+        if self.decimals_as not in ("string", "number"):
+            raise ValueError("decimals_as must be 'string' or 'number'")
+
+        if self.structured_output and self.citations:
+            raise ValueError(
+                "Claude citations are incompatible with structured outputs "
+                "(output_format). Disable citations or structured_output."
             )
 
     @property
@@ -186,6 +197,7 @@ class AnthropicLLM(LLM):
         tools: list[Tool] | None = None,
         temperature: float = 0.0,
         max_tokens: int = 4096,
+        output_format: dict[str, Any] | None = None,
     ) -> LLMResponse:
         """
         Generate a completion using Claude.
@@ -208,6 +220,18 @@ class AnthropicLLM(LLM):
             system_prompt, converted_messages = self._convert_messages(messages)
             converted_tools = self._convert_tools(tools)
 
+            if self.structured_output and self.citations:
+                raise ValueError(
+                    "Claude citations are incompatible with structured outputs "
+                    "(output_format). Disable citations or structured_output."
+                )
+
+            if output_format is not None and not self.structured_output:
+                raise ValueError("output_format requires structured_output=True")
+
+            if self.structured_output and output_format is None:
+                raise ValueError("structured_output=True requires output_format")
+
             kwargs: dict[str, Any] = {
                 "model": self.model,
                 "messages": converted_messages,
@@ -220,6 +244,12 @@ class AnthropicLLM(LLM):
 
             if converted_tools:
                 kwargs["tools"] = converted_tools
+
+            if self.structured_output:
+                kwargs["output_format"] = output_format
+                kwargs["extra_headers"] = {
+                    "anthropic-beta": "structured-outputs-2025-11-13"
+                }
 
             response = client.messages.create(**kwargs)
 
