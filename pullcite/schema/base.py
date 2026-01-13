@@ -390,6 +390,7 @@ class ExtractionSchema(metaclass=ExtractionSchemaMeta):
     @classmethod
     def to_json_schema(
         cls,
+        fields: dict[str, Field] | None = None,
         *,
         decimals_as: Literal["string", "number"] = "string",
         additional_properties: bool = False,
@@ -399,6 +400,7 @@ class ExtractionSchema(metaclass=ExtractionSchemaMeta):
         Generate JSON Schema for LLM structured output.
 
         Args:
+            fields: Optional subset of fields to include in the schema.
             decimals_as: Render DecimalField values as "string" or "number".
             additional_properties: Allow properties not in the schema.
             include_query_as_vendor_ext: Include field query as x-pullcite-query.
@@ -409,8 +411,10 @@ class ExtractionSchema(metaclass=ExtractionSchemaMeta):
         if decimals_as not in ("string", "number"):
             raise ValueError("decimals_as must be 'string' or 'number'")
 
+        fields_to_use = fields if fields is not None else cls._fields
+
         return cls._build_json_schema(
-            cls._fields,
+            fields_to_use,
             decimals_as=decimals_as,
             additional_properties=additional_properties,
             include_query_as_vendor_ext=include_query_as_vendor_ext,

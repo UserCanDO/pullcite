@@ -468,7 +468,7 @@ class SchemaExtractor:
 
         lines.append(
             "Return only a JSON object matching the schema. "
-            "Use null for values not found in the document."
+            "Omit optional fields when not found; never use null."
         )
 
         # Append extra instructions if provided
@@ -505,8 +505,8 @@ class SchemaExtractor:
         else:
             fields_to_include = self.schema.get_fields()
 
-        schema_json = self.schema._build_json_schema(
-            fields_to_include,
+        schema_json = self.schema.to_json_schema(
+            fields=fields_to_include,
             decimals_as=decimals_as,
             additional_properties=False,
             include_query_as_vendor_ext=True,

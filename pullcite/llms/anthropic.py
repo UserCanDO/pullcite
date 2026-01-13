@@ -232,6 +232,9 @@ class AnthropicLLM(LLM):
             if self.structured_output and output_format is None:
                 raise ValueError("structured_output=True requires output_format")
 
+            if self.structured_output:
+                converted_tools = None
+
             kwargs: dict[str, Any] = {
                 "model": self.model,
                 "messages": converted_messages,

@@ -398,12 +398,19 @@ class TestAnthropicComplete:
             },
         }
 
+        tools = [Tool(name="search", description="Search for info")]
+
         with patch.object(llm, "_get_client", return_value=mock_client):
-            llm.complete([Message.user("Hello")], output_format=output_format)
+            llm.complete(
+                [Message.user("Hello")],
+                tools=tools,
+                output_format=output_format,
+            )
 
         call_kwargs = mock_client.messages.create.call_args[1]
         assert call_kwargs["output_format"] == output_format
         assert call_kwargs["extra_headers"]["anthropic-beta"] == "structured-outputs-2025-11-13"
+        assert "tools" not in call_kwargs
 
     def test_complete_api_error(self):
         llm = AnthropicLLM(api_key="test-key")
