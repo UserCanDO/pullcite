@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from decimal import Decimal
 from enum import Enum
-from typing import Any, Callable, ClassVar, Generic, TypeVar, get_type_hints
+from typing import Any, Callable, ClassVar, Generic, Literal, TypeVar, get_type_hints
 
 T = TypeVar("T")
 
@@ -263,21 +263,118 @@ class ExtractionSchema(metaclass=ExtractionSchemaMeta):
             if v.search_type == SearchType.HYBRID
         }
 
+    @staticmethod
+    def _combine_descriptions(primary: str, secondary: str) -> str:
+        primary = primary.strip()
+        secondary = secondary.strip()
+        if not primary:
+            return secondary
+        if not secondary:
+            return primary
+        if primary.endswith("."):
+            return f"{primary} {secondary}"
+        return f"{primary}. {secondary}"
+
     @classmethod
-    def to_json_schema(cls) -> dict[str, Any]:
-        """
-        Generate JSON Schema for LLM structured output.
+    def _field_to_json_schema(
+        cls,
+        field_def: Field,
+        *,
+        decimals_as: Literal["string", "number"],
+    ) -> dict[str, Any]:
+        from .fields import (
+            BooleanField,
+            DateField,
+            DecimalField,
+            EnumField,
+            IntegerField,
+            ListField,
+            PercentField,
+            StringField,
+        )
 
-        Returns:
-            JSON Schema dict describing the extraction target.
-        """
-        properties = {}
-        required = []
+        if isinstance(field_def, ListField):
+            item_schema = {"type": "string"}
+            if field_def.item_field:
+                item_schema = cls._field_to_json_schema(
+                    field_def.item_field,
+                    decimals_as=decimals_as,
+                )
+                if field_def.item_field.description:
+                    item_desc = field_def.item_field.description
+                    if "description" in item_schema:
+                        item_schema["description"] = cls._combine_descriptions(
+                            item_desc,
+                            item_schema["description"],
+                        )
+                    else:
+                        item_schema["description"] = item_desc
+            return {"type": "array", "items": item_schema}
 
-        for name, field_def in cls._fields.items():
-            prop_schema = field_def.to_json_schema()
+        if isinstance(field_def, DecimalField):
+            if decimals_as == "number":
+                return {"type": "number"}
+            return {
+                "type": "string",
+                "description": 'Return a decimal string like "1500.00"',
+            }
+
+        if isinstance(field_def, PercentField):
+            return {
+                "type": "number",
+                "description": "Return percentage as a number from 0 to 100",
+            }
+
+        if isinstance(field_def, DateField):
+            return {
+                "type": "string",
+                "description": "Return date in ISO format YYYY-MM-DD",
+            }
+
+        if isinstance(field_def, EnumField):
+            return {"type": "string", "enum": list(field_def.choices)}
+
+        if isinstance(field_def, StringField):
+            return {"type": "string"}
+
+        if isinstance(field_def, IntegerField):
+            return {"type": "integer"}
+
+        if isinstance(field_def, BooleanField):
+            return {"type": "boolean"}
+
+        return field_def.to_json_schema()
+
+    @classmethod
+    def _build_json_schema(
+        cls,
+        fields: dict[str, Field],
+        *,
+        decimals_as: Literal["string", "number"],
+        additional_properties: bool,
+        include_query_as_vendor_ext: bool,
+    ) -> dict[str, Any]:
+        properties: dict[str, Any] = {}
+        required: list[str] = []
+
+        for name, field_def in fields.items():
+            prop_schema = cls._field_to_json_schema(
+                field_def,
+                decimals_as=decimals_as,
+            )
+
             if field_def.description:
-                prop_schema["description"] = field_def.description
+                if "description" in prop_schema:
+                    prop_schema["description"] = cls._combine_descriptions(
+                        field_def.description,
+                        prop_schema["description"],
+                    )
+                else:
+                    prop_schema["description"] = field_def.description
+
+            if include_query_as_vendor_ext and field_def.query:
+                prop_schema["x-pullcite-query"] = field_def.query
+
             properties[name] = prop_schema
 
             if field_def.required:
@@ -287,7 +384,41 @@ class ExtractionSchema(metaclass=ExtractionSchemaMeta):
             "type": "object",
             "properties": properties,
             "required": required,
+            "additionalProperties": additional_properties,
         }
+
+    @classmethod
+    def to_json_schema(
+        cls,
+        fields: dict[str, Field] | None = None,
+        *,
+        decimals_as: Literal["string", "number"] = "string",
+        additional_properties: bool = False,
+        include_query_as_vendor_ext: bool = True,
+    ) -> dict[str, Any]:
+        """
+        Generate JSON Schema for LLM structured output.
+
+        Args:
+            fields: Optional subset of fields to include in the schema.
+            decimals_as: Render DecimalField values as "string" or "number".
+            additional_properties: Allow properties not in the schema.
+            include_query_as_vendor_ext: Include field query as x-pullcite-query.
+
+        Returns:
+            JSON Schema dict describing the extraction target.
+        """
+        if decimals_as not in ("string", "number"):
+            raise ValueError("decimals_as must be 'string' or 'number'")
+
+        fields_to_use = fields if fields is not None else cls._fields
+
+        return cls._build_json_schema(
+            fields_to_use,
+            decimals_as=decimals_as,
+            additional_properties=additional_properties,
+            include_query_as_vendor_ext=include_query_as_vendor_ext,
+        )
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ExtractionSchema:

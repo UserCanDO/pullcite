@@ -467,8 +467,8 @@ class SchemaExtractor:
             lines.append("")
 
         lines.append(
-            "Return the extracted values as JSON matching the schema. "
-            "Use null for values not found in the document."
+            "Return only a JSON object matching the schema. "
+            "Omit optional fields when not found; never use null."
         )
 
         # Append extra instructions if provided
@@ -492,27 +492,25 @@ class SchemaExtractor:
             document: Document to extract from.
             field_names: Subset of fields to extract (None = all fields).
         """
-        # Build schema for specified fields only
+        structured_output = bool(getattr(self.llm, "structured_output", False))
+        decimals_as = getattr(self.llm, "decimals_as", "string")
+
         if field_names is not None:
             all_fields = self.schema.get_fields()
-            properties = {}
-            required = []
-            for name in field_names:
-                if name in all_fields:
-                    field_def = all_fields[name]
-                    prop_schema = field_def.to_json_schema()
-                    if field_def.description:
-                        prop_schema["description"] = field_def.description
-                    properties[name] = prop_schema
-                    if field_def.required:
-                        required.append(name)
-            schema_json = {
-                "type": "object",
-                "properties": properties,
-                "required": required,
+            fields_to_include = {
+                name: all_fields[name]
+                for name in field_names
+                if name in all_fields
             }
         else:
-            schema_json = self.schema.to_json_schema()
+            fields_to_include = self.schema.get_fields()
+
+        schema_json = self.schema.to_json_schema(
+            fields=fields_to_include,
+            decimals_as=decimals_as,
+            additional_properties=False,
+            include_query_as_vendor_ext=True,
+        )
 
         # Build user message with document text
         doc_text = document.full_text
@@ -527,19 +525,40 @@ class SchemaExtractor:
             Message(role=Role.USER, content=user_content),
         ]
 
-        # Use tool calling for structured output
-        tool = Tool(
-            name="extract_data",
-            description="Extract structured data from the document",
-            parameters=schema_json,
-        )
+        output_format = None
+        tools = None
 
-        response = self.llm.complete(
-            messages=messages,
-            tools=[tool],
-            temperature=self.temperature,
-            max_tokens=self.max_tokens,
-        )
+        if structured_output:
+            output_format = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": self.schema.__name__,
+                    "schema": schema_json,
+                },
+            }
+        else:
+            tool = Tool(
+                name="extract_data",
+                description="Extract structured data from the document",
+                parameters=schema_json,
+            )
+            tools = [tool]
+
+        if structured_output:
+            response = self.llm.complete(
+                messages=messages,
+                tools=tools,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                output_format=output_format,
+            )
+        else:
+            response = self.llm.complete(
+                messages=messages,
+                tools=tools,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+            )
 
         # Parse tool call response
         if response.tool_calls:

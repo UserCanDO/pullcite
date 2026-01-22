@@ -66,6 +66,11 @@ class TestAnthropicLLMInit:
         llm = AnthropicLLM(api_key="key", model="claude-3-opus-20240229")
         assert llm.model_name == "claude-3-opus-20240229"
 
+    def test_structured_output_citations_incompatible(self):
+        with pytest.raises(ValueError) as exc:
+            AnthropicLLM(api_key="key", structured_output=True, citations=True)
+        assert "Claude citations are incompatible" in str(exc.value)
+
 
 class TestAnthropicMessageConversion:
     """Test message format conversion."""
@@ -367,6 +372,45 @@ class TestAnthropicComplete:
         call_kwargs = mock_client.messages.create.call_args[1]
         assert "tools" in call_kwargs
         assert len(call_kwargs["tools"]) == 1
+
+    def test_complete_with_structured_output(self):
+        llm = AnthropicLLM(api_key="test-key", structured_output=True)
+
+        mock_text_block = MagicMock()
+        mock_text_block.type = "text"
+        mock_text_block.text = '{"name": "Test"}'
+
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.content = [mock_text_block]
+        mock_response.stop_reason = "end_turn"
+        mock_response.usage.input_tokens = 12
+        mock_response.usage.output_tokens = 6
+        mock_response.model = "claude-sonnet-4-20250514"
+
+        mock_client.messages.create.return_value = mock_response
+
+        output_format = {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "TestSchema",
+                "schema": {"type": "object", "properties": {"name": {"type": "string"}}},
+            },
+        }
+
+        tools = [Tool(name="search", description="Search for info")]
+
+        with patch.object(llm, "_get_client", return_value=mock_client):
+            llm.complete(
+                [Message.user("Hello")],
+                tools=tools,
+                output_format=output_format,
+            )
+
+        call_kwargs = mock_client.messages.create.call_args[1]
+        assert call_kwargs["output_format"] == output_format
+        assert call_kwargs["extra_headers"]["anthropic-beta"] == "structured-outputs-2025-11-13"
+        assert "tools" not in call_kwargs
 
     def test_complete_api_error(self):
         llm = AnthropicLLM(api_key="test-key")

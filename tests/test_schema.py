@@ -113,6 +113,41 @@ class TestExtractionSchema:
         assert schema["properties"]["name"]["type"] == "string"
         assert schema["properties"]["count"]["type"] == "integer"
 
+    def test_to_json_schema_options(self):
+        """Test JSON schema options and field mappings."""
+
+        class Doc(ExtractionSchema):
+            name = StringField(query="name", description="Full name")
+            amount = DecimalField(query="total", description="Total amount")
+            active = BooleanField(query="active", required=False)
+            plan = EnumField(query="plan type", choices=["basic", "pro"])
+            start_date = DateField(query="start date")
+            coinsurance = PercentField(query="coinsurance percent")
+            rates = ListField(query="rates", item_field=IntegerField(query="rate"))
+
+        schema = Doc.to_json_schema()
+
+        assert schema["additionalProperties"] is False
+        assert "active" not in schema["required"]
+        assert schema["properties"]["amount"]["type"] == "string"
+        assert "Total amount" in schema["properties"]["amount"]["description"]
+        assert "decimal string" in schema["properties"]["amount"]["description"]
+        assert schema["properties"]["plan"]["enum"] == ["basic", "pro"]
+        assert schema["properties"]["rates"]["items"]["type"] == "integer"
+        assert "YYYY-MM-DD" in schema["properties"]["start_date"]["description"]
+        assert "0 to 100" in schema["properties"]["coinsurance"]["description"]
+        assert schema["properties"]["name"]["x-pullcite-query"] == "name"
+
+        schema_number = Doc.to_json_schema(
+            decimals_as="number",
+            additional_properties=True,
+            include_query_as_vendor_ext=False,
+        )
+
+        assert schema_number["additionalProperties"] is True
+        assert schema_number["properties"]["amount"]["type"] == "number"
+        assert "x-pullcite-query" not in schema_number["properties"]["name"]
+
     def test_from_dict(self):
         """Test creating instance from dict."""
 
