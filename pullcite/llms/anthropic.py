@@ -7,6 +7,7 @@ Uses the Anthropic API to generate completions with Claude models.
 from __future__ import annotations
 
 import os
+import time
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -25,6 +26,10 @@ from .base import (
 ANTHROPIC_MODELS = {
     # Claude 4.5 (latest)
     "claude-opus-4-5-20251101": {"max_tokens": 8192},
+    "claude-opus-4-5": {"max_tokens": 8192},
+    "claude-sonnet-4-5": {"max_tokens": 8192},
+    "claude-haiku-4-5": {"max_tokens": 8192},
+    "claude-opus-4-1": {"max_tokens": 8192},
     # Claude 4
     "claude-sonnet-4-20250514": {"max_tokens": 8192},
     # Claude 3.5
@@ -191,6 +196,31 @@ class AnthropicLLM(LLM):
             model=response.model,
         )
 
+    def _normalize_output_format(
+        self, output_format: dict[str, Any] | None
+    ) -> dict[str, Any] | None:
+        """
+        Normalize output_format for Anthropic beta structured outputs.
+
+        Anthropic expects: {"type": "json_schema", "schema": {...}}
+        Pullcite builds: {"type": "json_schema", "json_schema": {"name": ..., "schema": {...}}}
+        """
+        if not output_format:
+            return None
+        json_schema = output_format.get("json_schema")
+        if json_schema:
+            schema = json_schema.get("schema", json_schema)
+            return {"type": "json_schema", "schema": schema}
+        return output_format
+
+    def _should_retry(self, error: Exception) -> bool:
+        """Return True for transient errors worth retrying."""
+        status_code = getattr(error, "status_code", None)
+        if status_code is None:
+            response = getattr(error, "response", None)
+            status_code = getattr(response, "status_code", None)
+        return status_code in {429, 500, 502, 503, 504}
+
     def complete(
         self,
         messages: list[Message],
@@ -248,15 +278,32 @@ class AnthropicLLM(LLM):
             if converted_tools:
                 kwargs["tools"] = converted_tools
 
-            if self.structured_output:
-                kwargs["output_format"] = output_format
-                kwargs["extra_headers"] = {
-                    "anthropic-beta": "structured-outputs-2025-11-13"
-                }
+            max_attempts = 3
+            backoff = 1.0
 
-            response = client.messages.create(**kwargs)
+            for attempt in range(max_attempts):
+                try:
+                    if self.structured_output:
+                        kwargs["output_format"] = self._normalize_output_format(
+                            output_format
+                        )
+                        kwargs["extra_headers"] = {
+                            "anthropic-beta": "structured-outputs-2025-11-13"
+                        }
+                        if not hasattr(client, "beta"):
+                            raise LLMError(
+                                "Anthropic beta client required for structured outputs."
+                            )
+                        response = client.beta.messages.create(**kwargs)
+                    else:
+                        response = client.messages.create(**kwargs)
 
-            return self._parse_response(response)
+                    return self._parse_response(response)
+                except Exception as e:
+                    if attempt < max_attempts - 1 and self._should_retry(e):
+                        time.sleep(backoff * (2**attempt))
+                        continue
+                    raise
 
         except LLMError:
             raise
