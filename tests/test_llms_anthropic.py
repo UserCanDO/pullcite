@@ -21,6 +21,10 @@ class TestAnthropicModels:
 
     def test_supported_models(self):
         assert "claude-opus-4-5-20251101" in ANTHROPIC_MODELS
+        assert "claude-opus-4-5" in ANTHROPIC_MODELS
+        assert "claude-sonnet-4-5" in ANTHROPIC_MODELS
+        assert "claude-haiku-4-5" in ANTHROPIC_MODELS
+        assert "claude-opus-4-1" in ANTHROPIC_MODELS
         assert "claude-sonnet-4-20250514" in ANTHROPIC_MODELS
         assert "claude-3-5-sonnet-20241022" in ANTHROPIC_MODELS
         assert "claude-3-5-haiku-20241022" in ANTHROPIC_MODELS
@@ -388,7 +392,7 @@ class TestAnthropicComplete:
         mock_response.usage.output_tokens = 6
         mock_response.model = "claude-sonnet-4-20250514"
 
-        mock_client.messages.create.return_value = mock_response
+        mock_client.beta.messages.create.return_value = mock_response
 
         output_format = {
             "type": "json_schema",
@@ -407,9 +411,18 @@ class TestAnthropicComplete:
                 output_format=output_format,
             )
 
-        call_kwargs = mock_client.messages.create.call_args[1]
-        assert call_kwargs["output_format"] == output_format
-        assert call_kwargs["extra_headers"]["anthropic-beta"] == "structured-outputs-2025-11-13"
+        call_kwargs = mock_client.beta.messages.create.call_args[1]
+        assert call_kwargs["output_format"] == {
+            "type": "json_schema",
+            "schema": {
+                "type": "object",
+                "properties": {"name": {"type": "string"}},
+            },
+        }
+        assert (
+            call_kwargs["extra_headers"]["anthropic-beta"]
+            == "structured-outputs-2025-11-13"
+        )
         assert "tools" not in call_kwargs
 
     def test_complete_api_error(self):
